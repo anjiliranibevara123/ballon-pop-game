@@ -142,6 +142,16 @@
         <span id="scoreDisplay" class="hud-value glow-text">0</span>
       </div>
 
+      <div class="hud-item combo-hud">
+        <span class="hud-label">COMBO</span>
+        <span id="comboDisplay" class="hud-value combo-badge">1x</span>
+      </div>
+
+      <div class="hud-item wave-hud">
+        <span class="hud-label">WAVE</span>
+        <span id="waveDisplay" class="hud-value wave-badge">WAVE 1</span>
+      </div>
+
       <div class="hud-item timer-hud">
         <span class="hud-label">TIME LEFT</span>
         <div class="timer-wrapper">
@@ -153,6 +163,11 @@
       <div class="hud-item level-hud">
         <span class="hud-label">DIFFICULTY</span>
         <span id="difficultyBadge" class="difficulty-badge level-easy">EASY</span>
+      </div>
+
+      <div class="hud-item gesture-hud">
+        <span class="hud-label">MODE</span>
+        <span id="gestureStatusBadge" class="gesture-badge">👌 PINCH</span>
       </div>
 
       <div class="hud-item balloon-count-hud">
@@ -177,6 +192,21 @@
           <span class="status-dot"></span> <span id="statusText">CAMERA LOADING...</span>
         </span>
       </div>
+    </div>
+
+    <!-- Freeze Time Vignette Effect -->
+    <div id="freezeVignette" class="freeze-vignette hidden"></div>
+
+    <!-- Dynamic Wave Notification Banner -->
+    <div id="waveBanner" class="wave-banner hidden">
+      <h2 id="waveBannerTitle">🌊 WAVE 1</h2>
+      <p id="waveBannerSub">GET READY!</p>
+    </div>
+
+    <!-- 3-2-1 Countdown Overlay -->
+    <div id="countdownOverlay" class="countdown-overlay hidden">
+      <span id="countdownNumber" class="countdown-num">3</span>
+      <span class="countdown-sub">PINCH OR CLICK TO POP!</span>
     </div>
 
     <!-- Initialization Loading Overlay -->
@@ -294,10 +324,15 @@
       <div class="error-icon">📷</div>
       <h2>Camera Access Required</h2>
       <p>Camera access is required to play this gesture-controlled game.</p>
-      <p class="error-subtext">Please make sure your webcam is connected, allow camera permissions in your browser settings, and try again.</p>
-      <button id="retryCameraBtn" class="btn btn-primary">
-        🔄 TRY AGAIN
-      </button>
+      <p class="error-subtext">Webcam access was not detected or denied. You can retry camera permissions or play instantly using Mouse/Touch controls!</p>
+      <div class="error-modal-actions">
+        <button id="retryCameraBtn" class="btn btn-primary">
+          🔄 RETRY CAMERA
+        </button>
+        <button id="playMouseBtn" class="btn btn-secondary">
+          🖱️ PLAY WITH MOUSE / TOUCH
+        </button>
+      </div>
     </div>
   </div>
 

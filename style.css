@@ -507,6 +507,46 @@ body, html {
   margin-top: 2px;
 }
 
+.combo-badge {
+  font-family: var(--font-score);
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #ff007f;
+  text-shadow: 0 0 12px #ff007f;
+  animation: comboFlamePulse 1.5s infinite alternate;
+}
+
+@keyframes comboFlamePulse {
+  0% { transform: scale(1); filter: drop-shadow(0 0 5px #ff007f); }
+  100% { transform: scale(1.1); filter: drop-shadow(0 0 15px #ff7700); }
+}
+
+.wave-badge {
+  font-family: var(--font-score);
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: var(--cyan-glow);
+  text-shadow: 0 0 10px var(--cyan-glow);
+}
+
+.gesture-badge {
+  font-family: var(--font-score);
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(0, 243, 255, 0.15);
+  color: var(--cyan-glow);
+  border: 1px solid var(--border-cyan);
+}
+
+.gesture-badge.pinching {
+  background: rgba(255, 0, 127, 0.25);
+  color: #ff007f;
+  border-color: #ff007f;
+  box-shadow: 0 0 12px #ff007f;
+}
+
 .level-easy { background: rgba(0, 255, 136, 0.2); color: var(--green-neon); border: 1px solid var(--green-neon); }
 .level-medium { background: rgba(255, 215, 0, 0.2); color: var(--gold-glow); border: 1px solid var(--gold-glow); }
 .level-hard { background: rgba(255, 0, 85, 0.2); color: var(--pink-neon); border: 1px solid var(--pink-neon); }
@@ -609,6 +649,128 @@ body, html {
 .loading-overlay p {
   color: var(--text-muted);
   font-size: 0.9rem;
+}
+
+/* --- Freeze Vignette Effect --- */
+.freeze-vignette {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 5;
+  box-shadow: inset 0 0 120px rgba(0, 243, 255, 0.6);
+  border: 4px solid rgba(0, 243, 255, 0.7);
+  animation: freezePulse 1.5s ease-in-out infinite alternate;
+}
+
+.freeze-vignette.hidden { display: none; }
+
+@keyframes freezePulse {
+  0% { opacity: 0.4; }
+  100% { opacity: 0.85; }
+}
+
+/* --- Countdown Overlay --- */
+.countdown-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(3, 7, 18, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.countdown-overlay.hidden { display: none; }
+
+.countdown-num {
+  font-family: var(--font-score);
+  font-size: 8rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, #00f3ff 0%, #ffffff 50%, #ff007f 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 30px rgba(0, 243, 255, 0.8));
+  animation: countPulse 0.8s ease-in-out infinite;
+}
+
+@keyframes countPulse {
+  0% { transform: scale(0.6); opacity: 0; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.countdown-sub {
+  font-family: var(--font-tech);
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: #c084fc;
+  margin-top: 15px;
+}
+
+/* --- Wave Notification Banner --- */
+.wave-banner {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 45;
+  background: linear-gradient(135deg, rgba(0, 243, 255, 0.2) 0%, rgba(168, 85, 247, 0.3) 100%);
+  border: 2px solid var(--cyan-glow);
+  padding: 20px 50px;
+  border-radius: 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  text-align: center;
+  box-shadow: 0 0 40px rgba(0, 243, 255, 0.5);
+  animation: waveSlide 2s ease-out forwards;
+}
+
+.wave-banner.hidden { display: none; }
+
+.wave-banner h2 {
+  font-family: var(--font-score);
+  font-size: 3rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 20px var(--cyan-glow);
+}
+
+.wave-banner p {
+  font-family: var(--font-tech);
+  font-size: 1rem;
+  color: #ffd700;
+  letter-spacing: 2px;
+  font-weight: 700;
+}
+
+/* --- Screen Shake for Bomb Hits --- */
+.screen-shake {
+  animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate3d(-3px, 0, 0); }
+  20%, 80% { transform: translate3d(5px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-7px, 0, 0); }
+  40%, 60% { transform: translate3d(7px, 0, 0); }
+}
+
+.error-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 15px;
 }
 
 /* --- Premium Game Over Modal & Score Showcase --- */

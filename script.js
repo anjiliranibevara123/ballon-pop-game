@@ -11,7 +11,18 @@ const state = {
   lastScore: parseInt(localStorage.getItem('gbp_last_score')) || 0,
   timeLeft: 30,
   timerInterval: null,
-  difficulty: 'EASY', // EASY (0-10s), MEDIUM (10-20s), HARD (20-30s)
+  difficulty: 'EASY', // EASY, MEDIUM, HARD
+  wave: 1,
+  
+  // Multipliers & Combos
+  combo: 0,
+  multiplier: 1,
+  misses: 0,
+  
+  // Special Mechanics & Timers
+  freezeTimer: 0,
+  speedMultiplier: 1.0,
+  isCountingDown: false,
   
   // Game Statistics
   balloonsPopped: 0,
@@ -20,8 +31,12 @@ const state = {
   bombsHit: 0,
   totalTouches: 0,
   
-  // Hand & Mouse/Touch Tracking Data
+  // Hand & Mouse/Touch Gesture Data
   handDetected: false,
+  isPinching: false,
+  wasPinching: false,
+  pinchJustTriggered: false,
+  pinchDist: 1.0,
   fingertip: { x: window.innerWidth / 2, y: window.innerHeight / 2, smoothX: window.innerWidth / 2, smoothY: window.innerHeight / 2 },
   cursor: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
   mousePos: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
@@ -199,6 +214,59 @@ class SoundEngine {
       osc.stop(now + idx * 0.08 + 0.4);
     });
   }
+
+  playFreeze() {
+    if (state.isMuted) return;
+    this.init();
+    const now = this.audioCtx.currentTime;
+    [1000, 800, 600, 400].forEach((freq, idx) => {
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+      gain.gain.setValueAtTime(0.2, now + idx * 0.05);
+      gain.gain.linearRampToValueAtTime(0.01, now + idx * 0.05 + 0.15);
+      osc.connect(gain);
+      gain.connect(this.audioCtx.destination);
+      osc.start(now + idx * 0.05);
+      osc.stop(now + idx * 0.05 + 0.15);
+    });
+  }
+
+  playTimeBonus() {
+    if (state.isMuted) return;
+    this.init();
+    const now = this.audioCtx.currentTime;
+    [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.04);
+      gain.gain.setValueAtTime(0.25, now + idx * 0.04);
+      gain.gain.linearRampToValueAtTime(0.01, now + idx * 0.04 + 0.1);
+      osc.connect(gain);
+      gain.connect(this.audioCtx.destination);
+      osc.start(now + idx * 0.04);
+      osc.stop(now + idx * 0.04 + 0.1);
+    });
+  }
+
+  playSplit() {
+    if (state.isMuted) return;
+    this.init();
+    const now = this.audioCtx.currentTime;
+    const osc = this.audioCtx.createOscillator();
+    const gain = this.audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(600, now);
+    osc.frequency.exponentialRampToValueAtTime(1400, now + 0.12);
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+    osc.connect(gain);
+    gain.connect(this.audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.12);
+  }
 }
 
 const sounds = new SoundEngine();
@@ -214,54 +282,73 @@ class Balloon {
   }
 
   reset(difficulty) {
-    // Balloon Types: NORMAL (+10), GOLDEN (+30), SPECIAL (+50), BOMB (-20)
     const rand = Math.random();
+    const wave = state.wave || 1;
 
-    if (difficulty === 'EASY') {
-      if (rand < 0.85) this.type = 'NORMAL';
-      else this.type = 'GOLDEN';
-    } else if (difficulty === 'MEDIUM') {
-      if (rand < 0.60) this.type = 'NORMAL';
-      else if (rand < 0.85) this.type = 'GOLDEN';
-      else if (rand < 0.93) this.type = 'SPECIAL';
-      else this.type = 'BOMB';
-    } else { // HARD
+    if (wave === 1) {
+      if (rand < 0.70) this.type = 'NORMAL';
+      else if (rand < 0.88) this.type = 'BONUS';
+      else this.type = 'TIME';
+    } else if (wave === 2) {
       if (rand < 0.45) this.type = 'NORMAL';
-      else if (rand < 0.70) this.type = 'GOLDEN';
-      else if (rand < 0.85) this.type = 'SPECIAL';
+      else if (rand < 0.65) this.type = 'BONUS';
+      else if (rand < 0.78) this.type = 'TIME';
+      else if (rand < 0.88) this.type = 'FREEZE';
+      else this.type = 'SPEED';
+    } else { // WAVE 3+
+      if (rand < 0.30) this.type = 'NORMAL';
+      else if (rand < 0.48) this.type = 'BONUS';
+      else if (rand < 0.60) this.type = 'TIME';
+      else if (rand < 0.72) this.type = 'FREEZE';
+      else if (rand < 0.82) this.type = 'SPLIT';
+      else if (rand < 0.90) this.type = 'SPEED';
       else this.type = 'BOMB';
     }
 
-    // Set Radius & Colors
     if (this.type === 'BOMB') {
-      this.radius = difficulty === 'HARD' ? 32 : 38;
+      this.radius = 34;
       this.color = '#1e293b';
       this.points = -20;
-    } else if (this.type === 'SPECIAL') {
-      this.radius = difficulty === 'HARD' ? 35 : 42;
-      this.color = '#9d4edd';
-      this.points = 50;
-    } else if (this.type === 'GOLDEN') {
-      this.radius = difficulty === 'HARD' ? 36 : 45;
+    } else if (this.type === 'SPLIT') {
+      this.radius = 42;
+      this.color = '#a855f7';
+      this.points = 15;
+    } else if (this.type === 'FREEZE') {
+      this.radius = 40;
+      this.color = '#00f3ff';
+      this.points = 20;
+    } else if (this.type === 'TIME') {
+      this.radius = 42;
+      this.color = '#00ff88';
+      this.points = 15;
+    } else if (this.type === 'SPEED') {
+      this.radius = 32;
+      this.color = '#ffb703';
+      this.points = 40;
+    } else if (this.type === 'BONUS') {
+      this.radius = 44;
       this.color = '#ffd700';
-      this.points = 30;
+      this.points = 35;
+    } else if (this.type === 'MINI') {
+      this.radius = 24;
+      this.color = '#e879f9';
+      this.points = 15;
     } else { // NORMAL
-      this.radius = difficulty === 'HARD' ? 38 : 48;
-      const normalColors = ['#ff0055', '#00f3ff', '#00ff88', '#ff9900', '#ff00aa'];
+      this.radius = 46;
+      const normalColors = ['#ff0055', '#00f3ff', '#00ff88', '#ff9900', '#a855f7'];
       this.color = normalColors[Math.floor(Math.random() * normalColors.length)];
       this.points = 10;
     }
 
-    // Position (safe within canvas bounds)
     const margin = this.radius + 30;
     this.x = margin + Math.random() * (this.width - margin * 2);
     this.y = this.height + this.radius + Math.random() * 80;
 
-    // Upward float velocity
-    let baseSpeed = difficulty === 'EASY' ? 1.8 : (difficulty === 'MEDIUM' ? 2.6 : 3.5);
+    let baseSpeed = difficulty === 'EASY' ? 2.0 : (difficulty === 'MEDIUM' ? 2.8 : 3.8);
+    if (this.type === 'SPEED') baseSpeed *= 1.7;
+    if (this.type === 'MINI') baseSpeed *= 1.4;
     this.speedY = baseSpeed + Math.random() * 1.2;
 
-    // Side wobble phase
     this.wobblePhase = Math.random() * Math.PI * 2;
     this.wobbleSpeed = 0.03 + Math.random() * 0.03;
     this.wobbleAmplitude = 1.2 + Math.random() * 1.5;
@@ -270,12 +357,19 @@ class Balloon {
   }
 
   update() {
-    this.y -= this.speedY;
+    const effectiveSpeed = this.speedY * state.speedMultiplier;
+    this.y -= effectiveSpeed;
     this.wobblePhase += this.wobbleSpeed;
     this.x += Math.sin(this.wobblePhase) * this.wobbleAmplitude;
 
-    // Respawn if floated off top edge
     if (this.y < -this.radius - 20) {
+      if (this.type !== 'BOMB' && !this.popped && state.screen === 'GAME' && !state.isCountingDown) {
+        state.misses++;
+        state.combo = 0;
+        state.multiplier = 1;
+        state.popTexts.push(new PopText(this.x, 30, 'MISSED!', '#94a3b8'));
+        updateHUD();
+      }
       this.reset(state.difficulty);
     }
   }
@@ -373,13 +467,37 @@ class Balloon {
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Badge for Golden / Special
-      if (this.type === 'GOLDEN' || this.type === 'SPECIAL') {
+      // Badge for Special Balloon Icons
+      if (this.type === 'BONUS' || this.type === 'GOLDEN' || this.type === 'SPECIAL') {
         ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${this.radius * 0.5}px Orbitron`;
+        ctx.font = `bold ${this.radius * 0.48}px Orbitron`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(this.points > 0 ? `+${this.points}` : `${this.points}`, 0, 0);
+        ctx.fillText(`+${this.points}`, 0, 0);
+      } else if (this.type === 'TIME') {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${this.radius * 0.55}px Orbitron`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('⏱️', 0, 0);
+      } else if (this.type === 'FREEZE') {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${this.radius * 0.55}px Orbitron`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('❄️', 0, 0);
+      } else if (this.type === 'SPLIT') {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${this.radius * 0.55}px Orbitron`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('💥', 0, 0);
+      } else if (this.type === 'SPEED') {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${this.radius * 0.55}px Orbitron`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('⚡', 0, 0);
       }
     }
 
@@ -519,32 +637,63 @@ function onHandResults(results) {
     state.handDetected = true;
     const landmarks = results.multiHandLandmarks[0];
 
-    // Target Landmark 8 = Index Finger Tip (INDEX_FINGER_TIP)
+    const thumbTip = landmarks[4];
     const indexTip = landmarks[8];
 
-    // Convert normalized (0..1) coords to Game Canvas pixel space
-    // Mirror horizontal axis (1 - indexTip.x) because webcam feed is mirrored!
     const targetX = (1 - indexTip.x) * state.canvas.width;
     const targetY = indexTip.y * state.canvas.height;
 
-    // Smooth position filtering (Exponential Moving Average)
-    state.fingertip.smoothX += (targetX - state.fingertip.smoothX) * 0.5;
-    state.fingertip.smoothY += (targetY - state.fingertip.smoothY) * 0.5;
+    state.fingertip.smoothX += (targetX - state.fingertip.smoothX) * 0.55;
+    state.fingertip.smoothY += (targetY - state.fingertip.smoothY) * 0.55;
     state.fingertip.x = state.fingertip.smoothX;
     state.fingertip.y = state.fingertip.smoothY;
 
     state.cursor.x = state.fingertip.x;
     state.cursor.y = state.fingertip.y;
 
+    const dx = indexTip.x - thumbTip.x;
+    const dy = indexTip.y - thumbTip.y;
+    const dist = Math.hypot(dx, dy);
+
+    state.pinchDist = dist;
+    const isPinchNow = dist < 0.075;
+
+    if (isPinchNow && !state.wasPinching) {
+      state.pinchJustTriggered = true;
+    } else {
+      state.pinchJustTriggered = false;
+    }
+    state.wasPinching = isPinchNow;
+    state.isPinching = isPinchNow;
+
+    const gestureBadge = document.getElementById('gestureStatusBadge');
+    if (gestureBadge) {
+      if (state.isPinching) {
+        gestureBadge.innerText = '👌 PINCH!';
+        gestureBadge.classList.add('pinching');
+      } else {
+        gestureBadge.innerText = '✋ HOVERING';
+        gestureBadge.classList.remove('pinching');
+      }
+    }
+
     document.getElementById('trackingStatus').className = 'tracking-status active';
     document.getElementById('statusText').innerText = 'HAND TRACKED';
   } else {
     state.handDetected = false;
+    state.isPinching = false;
+    state.wasPinching = false;
     state.cursor.x = state.mousePos.x;
     state.cursor.y = state.mousePos.y;
 
+    const gestureBadge = document.getElementById('gestureStatusBadge');
+    if (gestureBadge) {
+      gestureBadge.innerText = '🖱️ MOUSE';
+      gestureBadge.classList.remove('pinching');
+    }
+
     document.getElementById('trackingStatus').className = 'tracking-status searching';
-    document.getElementById('statusText').innerText = 'SEARCHING HAND...';
+    document.getElementById('statusText').innerText = 'SEARCHING HAND (MOUSE MODE)';
   }
 }
 
@@ -556,28 +705,34 @@ function startNewGame() {
   state.score = 0;
   state.timeLeft = 30;
   state.difficulty = 'EASY';
+  state.wave = 1;
+  state.combo = 0;
+  state.multiplier = 1;
+  state.misses = 0;
   state.balloonsPopped = 0;
   state.goldenPopped = 0;
   state.specialPopped = 0;
   state.bombsHit = 0;
   state.totalTouches = 0;
+  state.freezeTimer = 0;
+  state.speedMultiplier = 1.0;
+
+  const vignette = document.getElementById('freezeVignette');
+  if (vignette) vignette.classList.add('hidden');
 
   updateHUD();
 
-  // Resize Canvas to full window
   state.canvas = document.getElementById('gameCanvas');
   state.ctx = state.canvas.getContext('2d');
   resizeCanvas();
 
   setupCanvasInputListeners();
 
-  // Reset Cursor to center
   state.cursor.x = state.canvas.width / 2;
   state.cursor.y = state.canvas.height / 2;
   state.mousePos.x = state.canvas.width / 2;
   state.mousePos.y = state.canvas.height / 2;
 
-  // Initialize Balloons
   state.balloons = [];
   state.particles = [];
   state.popTexts = [];
@@ -586,29 +741,89 @@ function startNewGame() {
     state.balloons.push(new Balloon(state.canvas.width, state.canvas.height, state.difficulty));
   }
 
-  // Start Timer
-  clearInterval(state.timerInterval);
-  state.timerInterval = setInterval(gameTimerTick, 1000);
-
-  // Switch Screens
   showScreen('gameScreen');
 
-  // Launch Game Animation Loop
-  if (state.gameLoopId) cancelAnimationFrame(state.gameLoopId);
-  gameLoop();
+  runCountdown(() => {
+    clearInterval(state.timerInterval);
+    state.timerInterval = setInterval(gameTimerTick, 1000);
+
+    if (state.gameLoopId) cancelAnimationFrame(state.gameLoopId);
+    gameLoop();
+  });
+}
+
+function runCountdown(callback) {
+  state.isCountingDown = true;
+  const overlay = document.getElementById('countdownOverlay');
+  const num = document.getElementById('countdownNumber');
+  if (!overlay || !num) {
+    state.isCountingDown = false;
+    callback();
+    return;
+  }
+
+  overlay.classList.remove('hidden');
+  let count = 3;
+  num.innerText = count;
+
+  const countTimer = setInterval(() => {
+    count--;
+    if (count > 0) {
+      num.innerText = count;
+      sounds.playTick();
+    } else if (count === 0) {
+      num.innerText = 'GO!';
+      sounds.playGoldenPop();
+    } else {
+      clearInterval(countTimer);
+      overlay.classList.add('hidden');
+      state.isCountingDown = false;
+      showWaveBanner('🌊 WAVE 1', 'GET READY TO POP!');
+      callback();
+    }
+  }, 850);
+}
+
+function showWaveBanner(title, sub) {
+  const banner = document.getElementById('waveBanner');
+  const titleEl = document.getElementById('waveBannerTitle');
+  const subEl = document.getElementById('waveBannerSub');
+  if (banner && titleEl && subEl) {
+    titleEl.innerText = title;
+    subEl.innerText = sub;
+    banner.classList.remove('hidden');
+    setTimeout(() => banner.classList.add('hidden'), 2000);
+  }
 }
 
 function gameTimerTick() {
-  state.timeLeft--;
-  
-  // Difficulty System curve:
-  // 0-10s -> EASY, 10-20s -> MEDIUM, 20-30s -> HARD
-  const elapsed = 30 - state.timeLeft;
-  if (elapsed >= 20) state.difficulty = 'HARD';
-  else if (elapsed >= 10) state.difficulty = 'MEDIUM';
-  else state.difficulty = 'EASY';
+  if (state.isCountingDown) return;
 
-  // Sound tick in last 5 seconds
+  state.timeLeft--;
+
+  // Handle freeze timer countdown
+  if (state.freezeTimer > 0) {
+    state.freezeTimer -= 1000;
+    if (state.freezeTimer <= 0) {
+      state.speedMultiplier = 1.0;
+      const vignette = document.getElementById('freezeVignette');
+      if (vignette) vignette.classList.add('hidden');
+    }
+  }
+
+  // Wave & Difficulty Progression
+  const elapsed = 30 - state.timeLeft;
+
+  if (elapsed === 10 && state.wave === 1) {
+    state.wave = 2;
+    state.difficulty = 'MEDIUM';
+    showWaveBanner('🌊 WAVE 2', 'FREEZE & TIME BALLOONS UNLOCKED!');
+  } else if (elapsed === 20 && state.wave === 2) {
+    state.wave = 3;
+    state.difficulty = 'HARD';
+    showWaveBanner('🌊 WAVE 3', 'SPLIT & BOMB HAZARDS ACTIVE!');
+  }
+
   if (state.timeLeft <= 5 && state.timeLeft > 0) {
     sounds.playTick();
   }
@@ -631,14 +846,16 @@ function gameLoop() {
     balloon.update();
     balloon.draw(ctx);
 
-    // Collision Detection with Cursor (Hand OR Mouse/Touch fallback)
-    if (!balloon.popped) {
+    // Collision Detection: Trigger pop when pinching OR mouse/touch active
+    if (!balloon.popped && !state.isCountingDown) {
       const dx = state.cursor.x - balloon.x;
       const dy = state.cursor.y - balloon.y;
       const dist = Math.hypot(dx, dy);
 
-      // Collision tolerance buffer (+20px for smooth gameplay)
-      if (dist < balloon.radius + 20) {
+      const isHovering = dist < balloon.radius + 20;
+      const shouldPop = isHovering && (state.isPinching || !state.handDetected);
+
+      if (shouldPop) {
         popBalloon(balloon);
       }
     }
@@ -660,7 +877,7 @@ function gameLoop() {
     if (pt.alpha <= 0) state.popTexts.splice(i, 1);
   }
 
-  // 4. Always Draw Laser Fingertip Reticle Cursor
+  // 4. Always Draw Laser Reticle Cursor
   drawFingertipCursor(ctx, state.cursor.x, state.cursor.y);
 
   state.gameLoopId = requestAnimationFrame(gameLoop);
@@ -670,68 +887,132 @@ function popBalloon(balloon) {
   balloon.popped = true;
   state.totalTouches++;
 
-  // Update Score & Statistics
-  state.score = Math.max(0, state.score + balloon.points);
-
   if (balloon.type === 'BOMB') {
     state.bombsHit++;
+    state.combo = 0;
+    state.multiplier = 1;
     sounds.playBomb();
+    triggerScreenShake();
+    state.score = Math.max(0, state.score + balloon.points);
+    state.popTexts.push(new PopText(balloon.x, balloon.y - 10, '-20 (COMBO RESET)', '#ff0055'));
   } else {
     state.balloonsPopped++;
-    if (balloon.type === 'GOLDEN') {
+    state.combo++;
+    state.multiplier = Math.min(5, Math.floor(state.combo / 3) + 1);
+
+    const earnedPoints = balloon.points * state.multiplier;
+    state.score += earnedPoints;
+
+    let popLabel = `+${earnedPoints}`;
+    if (state.multiplier > 1) popLabel += ` (${state.multiplier}x)`;
+
+    if (balloon.type === 'TIME') {
+      state.timeLeft = Math.min(60, state.timeLeft + 5);
+      sounds.playTimeBonus();
+      state.popTexts.push(new PopText(balloon.x, balloon.y - 10, '+5s TIME!', '#00ff88'));
+    } else if (balloon.type === 'FREEZE') {
+      triggerFreezeEffect();
+      sounds.playFreeze();
+      state.popTexts.push(new PopText(balloon.x, balloon.y - 10, '❄️ FREEZE (4s)!', '#00f3ff'));
+    } else if (balloon.type === 'SPLIT') {
+      spawnMiniBalloons(balloon.x, balloon.y);
+      sounds.playSplit();
+      state.popTexts.push(new PopText(balloon.x, balloon.y - 10, '💥 SPLIT!', '#a855f7'));
+    } else if (balloon.type === 'BONUS' || balloon.type === 'GOLDEN') {
       state.goldenPopped++;
       sounds.playGoldenPop();
-    } else if (balloon.type === 'SPECIAL') {
-      state.specialPopped++;
+      state.popTexts.push(new PopText(balloon.x, balloon.y - 10, popLabel, '#ffd700'));
+    } else if (balloon.type === 'SPEED') {
       sounds.playSpecialPop();
+      state.popTexts.push(new PopText(balloon.x, balloon.y - 10, `${popLabel} ⚡`, '#ffb703'));
     } else {
       sounds.playPop();
+      state.popTexts.push(new PopText(balloon.x, balloon.y - 10, popLabel, balloon.color));
     }
   }
 
-  // Create Particle Explosion
   const particleColor = balloon.type === 'BOMB' ? '#ff0055' : balloon.color;
   for (let i = 0; i < 18; i++) {
     state.particles.push(new Particle(balloon.x, balloon.y, particleColor));
   }
 
-  // Spawn Score Pop Text
-  const textStr = balloon.points > 0 ? `+${balloon.points}` : `${balloon.points}`;
-  const textColor = balloon.points > 0 ? (balloon.type === 'GOLDEN' ? '#ffd700' : '#00f3ff') : '#ff0055';
-  state.popTexts.push(new PopText(balloon.x, balloon.y - 10, textStr, textColor));
-
   updateHUD();
 
-  // Reset/respawn balloon
-  balloon.reset(state.difficulty);
+  if (balloon.type !== 'MINI') {
+    balloon.reset(state.difficulty);
+  }
+}
+
+function spawnMiniBalloons(x, y) {
+  for (let i = 0; i < 3; i++) {
+    const mini = new Balloon(state.canvas.width, state.canvas.height, state.difficulty);
+    mini.type = 'MINI';
+    mini.radius = 24;
+    mini.color = '#e879f9';
+    mini.points = 15;
+    mini.x = x + (i - 1) * 35;
+    mini.y = y;
+    mini.speedY = 3.5 + Math.random() * 1.5;
+    state.balloons.push(mini);
+  }
+}
+
+function triggerFreezeEffect() {
+  state.freezeTimer = 4000;
+  state.speedMultiplier = 0.4;
+  const vignette = document.getElementById('freezeVignette');
+  if (vignette) vignette.classList.remove('hidden');
+}
+
+function triggerScreenShake() {
+  const gameScreen = document.getElementById('gameScreen');
+  if (gameScreen) {
+    gameScreen.classList.add('screen-shake');
+    setTimeout(() => gameScreen.classList.remove('screen-shake'), 450);
+  }
 }
 
 function drawFingertipCursor(ctx, x, y) {
   ctx.save();
 
-  // Outer Glowing Reticle Ring
-  const pulse = Math.sin(Date.now() * 0.01) * 4;
+  const isPinch = state.isPinching;
+  const color = isPinch ? '#ff007f' : '#00f3ff';
+  const radius = isPinch ? 16 : 24;
+
+  const pulse = Math.sin(Date.now() * 0.015) * 3;
   ctx.beginPath();
-  ctx.arc(x, y, 22 + pulse, 0, Math.PI * 2);
-  ctx.strokeStyle = '#00f3ff';
-  ctx.lineWidth = 3;
-  ctx.shadowColor = '#00f3ff';
-  ctx.shadowBlur = 15;
+  ctx.arc(x, y, radius + pulse, 0, Math.PI * 2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = isPinch ? 4 : 2.5;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 18;
   ctx.stroke();
 
-  // Inner Laser Tip Dot
+  // Crosshair Ticks
+  const tickLen = 8;
   ctx.beginPath();
-  ctx.arc(x, y, 8, 0, Math.PI * 2);
-  ctx.fillStyle = '#ff0055';
-  ctx.shadowColor = '#ff0055';
+  ctx.moveTo(x - radius - tickLen, y); ctx.lineTo(x - radius + 2, y);
+  ctx.moveTo(x + radius + tickLen, y); ctx.lineTo(x + radius - 2, y);
+  ctx.moveTo(x, y - radius - tickLen); ctx.lineTo(x, y - radius + 2);
+  ctx.moveTo(x, y + radius + tickLen); ctx.lineTo(x, y + radius - 2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Inner Core Dot
+  ctx.beginPath();
+  ctx.arc(x, y, isPinch ? 9 : 5, 0, Math.PI * 2);
+  ctx.fillStyle = isPinch ? '#ffffff' : '#ff0055';
+  ctx.shadowColor = isPinch ? '#ff007f' : '#ff0055';
   ctx.shadowBlur = 20;
   ctx.fill();
 
-  // Center Precision Crosshair Dot
-  ctx.beginPath();
-  ctx.arc(x, y, 3, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
+  // Status Text next to reticle
+  ctx.font = '700 11px Orbitron';
+  ctx.fillStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 8;
+  ctx.fillText(isPinch ? '👌 PINCH!' : '✋ POINT', x + radius + 10, y + 4);
 
   ctx.restore();
 }
@@ -740,6 +1021,12 @@ function updateHUD() {
   document.getElementById('scoreDisplay').innerText = state.score;
   document.getElementById('timerDisplay').innerText = state.timeLeft;
   document.getElementById('balloonsPoppedDisplay').innerText = state.balloonsPopped;
+
+  const comboEl = document.getElementById('comboDisplay');
+  if (comboEl) comboEl.innerText = `${state.multiplier}x`;
+
+  const waveEl = document.getElementById('waveDisplay');
+  if (waveEl) waveEl.innerText = `WAVE ${state.wave}`;
 
   const badge = document.getElementById('difficultyBadge');
   badge.innerText = state.difficulty;
@@ -942,6 +1229,16 @@ function setupEventListeners() {
     document.getElementById('loadingOverlay').classList.remove('hidden');
     initHandTracking();
   });
+
+  const playMouseBtn = document.getElementById('playMouseBtn');
+  if (playMouseBtn) {
+    playMouseBtn.addEventListener('click', () => {
+      hideModal('cameraErrorModal');
+      document.getElementById('loadingOverlay').classList.add('hidden');
+      sounds.init();
+      startNewGame();
+    });
+  }
 
   // Sound Toggle Button
   document.getElementById('soundToggleBtn').addEventListener('click', () => {
