@@ -422,6 +422,7 @@ body, html {
   width: 100vw;
   height: 100vh;
   z-index: 1;
+  cursor: crosshair;
 }
 
 /* --- HUD Top Bar --- */
@@ -432,10 +433,40 @@ body, html {
   transform: translateX(-50%);
   z-index: 20;
   display: flex;
-  gap: 30px;
-  padding: 12px 35px;
+  gap: 25px;
+  padding: 10px 30px;
   border-radius: 50px;
   align-items: center;
+}
+
+.hud-exit-btn {
+  background: rgba(255, 0, 85, 0.18);
+  border: 1.5px solid var(--pink-neon);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-family: var(--font-score);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px rgba(255, 0, 85, 0.3);
+}
+
+.hud-exit-btn:hover {
+  background: var(--pink-neon);
+  color: #fff;
+  box-shadow: 0 0 20px var(--pink-neon);
+  transform: scale(1.08);
+}
+
+.leaderboard-modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
 }
 
 .hud-item {

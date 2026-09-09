@@ -20,9 +20,11 @@ const state = {
   bombsHit: 0,
   totalTouches: 0,
   
-  // Hand Tracking Data
+  // Hand & Mouse/Touch Tracking Data
   handDetected: false,
-  fingertip: { x: 0, y: 0, smoothX: 0, smoothY: 0 },
+  fingertip: { x: window.innerWidth / 2, y: window.innerHeight / 2, smoothX: window.innerWidth / 2, smoothY: window.innerHeight / 2 },
+  cursor: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+  mousePos: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
   
   // Settings & Canvas
   isMuted: false,
@@ -531,10 +533,16 @@ function onHandResults(results) {
     state.fingertip.x = state.fingertip.smoothX;
     state.fingertip.y = state.fingertip.smoothY;
 
+    state.cursor.x = state.fingertip.x;
+    state.cursor.y = state.fingertip.y;
+
     document.getElementById('trackingStatus').className = 'tracking-status active';
     document.getElementById('statusText').innerText = 'HAND TRACKED';
   } else {
     state.handDetected = false;
+    state.cursor.x = state.mousePos.x;
+    state.cursor.y = state.mousePos.y;
+
     document.getElementById('trackingStatus').className = 'tracking-status searching';
     document.getElementById('statusText').innerText = 'SEARCHING HAND...';
   }
@@ -560,6 +568,14 @@ function startNewGame() {
   state.canvas = document.getElementById('gameCanvas');
   state.ctx = state.canvas.getContext('2d');
   resizeCanvas();
+
+  setupCanvasInputListeners();
+
+  // Reset Cursor to center
+  state.cursor.x = state.canvas.width / 2;
+  state.cursor.y = state.canvas.height / 2;
+  state.mousePos.x = state.canvas.width / 2;
+  state.mousePos.y = state.canvas.height / 2;
 
   // Initialize Balloons
   state.balloons = [];
@@ -615,14 +631,14 @@ function gameLoop() {
     balloon.update();
     balloon.draw(ctx);
 
-    // Collision Detection with Fingertip
-    if (state.handDetected && !balloon.popped) {
-      const dx = state.fingertip.x - balloon.x;
-      const dy = state.fingertip.y - balloon.y;
+    // Collision Detection with Cursor (Hand OR Mouse/Touch fallback)
+    if (!balloon.popped) {
+      const dx = state.cursor.x - balloon.x;
+      const dy = state.cursor.y - balloon.y;
       const dist = Math.hypot(dx, dy);
 
-      // Collision tolerance buffer (+18px for smooth touch gameplay)
-      if (dist < balloon.radius + 18) {
+      // Collision tolerance buffer (+20px for smooth gameplay)
+      if (dist < balloon.radius + 20) {
         popBalloon(balloon);
       }
     }
@@ -644,10 +660,8 @@ function gameLoop() {
     if (pt.alpha <= 0) state.popTexts.splice(i, 1);
   }
 
-  // 4. Draw Laser Fingertip Cursor
-  if (state.handDetected) {
-    drawFingertipCursor(ctx, state.fingertip.x, state.fingertip.y);
-  }
+  // 4. Always Draw Laser Fingertip Reticle Cursor
+  drawFingertipCursor(ctx, state.cursor.x, state.cursor.y);
 
   state.gameLoopId = requestAnimationFrame(gameLoop);
 }
@@ -897,6 +911,15 @@ function setupEventListeners() {
     hideModal('leaderboardModal');
   });
 
+  document.getElementById('leaderboardHomeBtn').addEventListener('click', () => {
+    hideModal('leaderboardModal');
+    exitGameToHome();
+  });
+
+  document.getElementById('exitGameBtn').addEventListener('click', () => {
+    exitGameToHome();
+  });
+
   document.getElementById('playAgainBtn').addEventListener('click', () => {
     hideModal('gameOverModal');
     startNewGame();
@@ -962,6 +985,54 @@ function resizeCanvas() {
 function updateHomeScreenScores() {
   document.getElementById('homeBestScore').innerText = state.bestScore;
   document.getElementById('homeLastScore').innerText = state.lastScore;
+}
+
+function exitGameToHome() {
+  state.screen = 'HOME';
+  clearInterval(state.timerInterval);
+  if (state.gameLoopId) cancelAnimationFrame(state.gameLoopId);
+  updateHomeScreenScores();
+  showScreen('homeScreen');
+}
+
+let canvasListenersAttached = false;
+function setupCanvasInputListeners() {
+  if (canvasListenersAttached) return;
+  const canvas = document.getElementById('gameCanvas');
+  if (!canvas) return;
+
+  const updatePointer = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    state.mousePos.x = clientX - rect.left;
+    state.mousePos.y = clientY - rect.top;
+
+    if (!state.handDetected) {
+      state.cursor.x = state.mousePos.x;
+      state.cursor.y = state.mousePos.y;
+    }
+  };
+
+  canvas.addEventListener('mousemove', updatePointer);
+  canvas.addEventListener('touchmove', updatePointer, { passive: true });
+  canvas.addEventListener('touchstart', updatePointer, { passive: true });
+  canvas.addEventListener('click', (e) => {
+    updatePointer(e);
+    if (state.screen === 'GAME') {
+      state.balloons.forEach((balloon) => {
+        if (!balloon.popped) {
+          const dx = state.cursor.x - balloon.x;
+          const dy = state.cursor.y - balloon.y;
+          if (Math.hypot(dx, dy) < balloon.radius + 22) {
+            popBalloon(balloon);
+          }
+        }
+      });
+    }
+  });
+
+  canvasListenersAttached = true;
 }
 
 // ==========================================================================
