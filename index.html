@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎈 GESTURE BALLOON POP | Engineers' Day 2026 Edition</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,700;0,900;1,700&family=Orbitron:wght@500;700;900&family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  
+  <!-- MediaPipe Hands CDN dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Tech Animated Background Grid & Particles -->
+  <div class="tech-bg">
+    <div class="grid-overlay"></div>
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+  </div>
+
+  <!-- Audio Mute / Unmute Floating Toggle -->
+  <button id="soundToggleBtn" class="sound-toggle-btn" title="Toggle Sound">
+    <span id="soundIcon">🔊</span>
+  </button>
+
+  <!-- ==================== HOME SCREEN ==================== -->
+  <div id="homeScreen" class="screen active">
+    <div class="event-badge">
+      <span class="badge-icon">🚀</span> ENGINEERS' DAY 2026 • SPECIAL CHALLENGE
+    </div>
+
+    <h1 class="main-title">
+      <span class="title-emoji">🎈</span> GESTURE BALLOON POP
+    </h1>
+    <p class="subtitle">Can you beat the fastest engineer?</p>
+
+    <!-- Score Summary Cards -->
+    <div class="score-cards-container">
+      <div class="score-card best-score-card">
+        <span class="card-label">🏆 BEST SCORE</span>
+        <span id="homeBestScore" class="card-value">0</span>
+      </div>
+      <div class="score-card last-score-card">
+        <span class="card-label">⏱️ LAST SCORE</span>
+        <span id="homeLastScore" class="card-value">0</span>
+      </div>
+    </div>
+
+    <!-- Main Navigation Buttons -->
+    <div class="menu-buttons">
+      <button id="startGameBtn" class="btn btn-primary">
+        <span class="btn-glow"></span>
+        <span class="btn-text">🎮 START GAME</span>
+      </button>
+      <button id="howToPlayBtn" class="btn btn-secondary">
+        <span class="btn-text">❓ HOW TO PLAY</span>
+      </button>
+      <button id="viewLeaderboardBtn" class="btn btn-secondary">
+        <span class="btn-text">🏆 LEADERBOARD</span>
+      </button>
+    </div>
+
+    <footer class="tech-footer">
+      Powered by MediaPipe AI Hand Tracking • Built for Engineers' Day
+    </footer>
+  </div>
+
+  <!-- ==================== HOW TO PLAY MODAL ==================== -->
+  <div id="howToPlayModal" class="modal">
+    <div class="modal-content glass-card">
+      <div class="modal-header">
+        <h2>🛠️ HOW TO PLAY</h2>
+        <button id="closeHowToPlayBtn" class="close-btn">&times;</button>
+      </div>
+
+      <div class="instructions-grid">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <div class="step-icon">📷</div>
+          <h3>Allow Camera</h3>
+          <p>Grant browser webcam permission when prompted.</p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <div class="step-icon">🧍</div>
+          <h3>Position Yourself</h3>
+          <p>Stand 2–3 feet from the webcam in good lighting.</p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <div class="step-icon">☝️</div>
+          <h3>Use Index Finger</h3>
+          <p>Point with your index finger. A glowing laser dot tracks your tip!</p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">4</div>
+          <div class="step-icon">🎈</div>
+          <h3>Touch to Pop</h3>
+          <p>Move your glowing fingertip cursor over balloons to pop them.</p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">5</div>
+          <div class="step-icon">⭐</div>
+          <h3>Balloon Types</h3>
+          <p><strong>Normal:</strong> +10 | <strong>Gold:</strong> +30 | <strong>Special:</strong> +50 | <strong>Bomb:</strong> -20</p>
+        </div>
+
+        <div class="step-card">
+          <div class="step-num">6</div>
+          <div class="step-icon">⏳</div>
+          <h3>30 Seconds</h3>
+          <p>Pop maximum balloons before the time runs out!</p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="startFromGuideBtn" class="btn btn-primary width-full">
+          🚀 I'M READY - START GAME
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== GAME SCREEN ==================== -->
+  <div id="gameScreen" class="screen">
+    
+    <!-- Top HUD Bar -->
+    <div class="hud-bar glass-card">
+      <div class="hud-item score-hud">
+        <span class="hud-label">SCORE</span>
+        <span id="scoreDisplay" class="hud-value glow-text">0</span>
+      </div>
+
+      <div class="hud-item timer-hud">
+        <span class="hud-label">TIME LEFT</span>
+        <div class="timer-wrapper">
+          <span id="timerDisplay" class="hud-value warning-text">30</span>
+          <span class="unit">s</span>
+        </div>
+      </div>
+
+      <div class="hud-item level-hud">
+        <span class="hud-label">DIFFICULTY</span>
+        <span id="difficultyBadge" class="difficulty-badge level-easy">EASY</span>
+      </div>
+
+      <div class="hud-item balloon-count-hud">
+        <span class="hud-label">POPPED</span>
+        <span id="balloonsPoppedDisplay" class="hud-value">0</span>
+      </div>
+    </div>
+
+    <!-- Game Canvas Arena -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Webcam Corner Preview PIP -->
+    <div id="webcamPipContainer" class="webcam-pip">
+      <video id="webcamVideo" autoplay playsinline muted></video>
+      <div class="pip-overlay">
+        <span id="trackingStatus" class="tracking-status searching">
+          <span class="status-dot"></span> <span id="statusText">CAMERA LOADING...</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Initialization Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+      <div class="spinner"></div>
+      <h2>INITIALIZING AI HAND TRACKING...</h2>
+      <p>Please allow camera access in your browser prompt</p>
+    </div>
+  </div>
+
+  <!-- ==================== GAME OVER MODAL ==================== -->
+  <div id="gameOverModal" class="modal">
+    <div class="modal-content glass-card game-over-card">
+      <h1 class="game-over-title">🎉 TIME'S UP!</h1>
+      <p class="event-tag">ENGINEERS' DAY 2026 BALLOON CHALLENGE</p>
+
+      <div class="final-score-box">
+        <span class="final-score-label">FINAL SCORE</span>
+        <span id="finalScoreDisplay" class="final-score-value">0</span>
+      </div>
+
+      <!-- Stats Breakdown Grid -->
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="stat-emoji">🎈</span>
+          <span id="statPopped" class="stat-val">0</span>
+          <span class="stat-lbl">Balloons Popped</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-emoji">⭐</span>
+          <span id="statGolden" class="stat-val">0</span>
+          <span class="stat-lbl">Golden & Special</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-emoji">💣</span>
+          <span id="statBombs" class="stat-val">0</span>
+          <span class="stat-lbl">Bombs Hit</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-emoji">🎯</span>
+          <span id="statAccuracy" class="stat-val">100%</span>
+          <span class="stat-lbl">Accuracy</span>
+        </div>
+      </div>
+
+      <!-- Player Leaderboard Entry Form -->
+      <div class="leaderboard-entry-form">
+        <label for="playerNameInput">Enter Your Name for the Leaderboard:</label>
+        <div class="input-group">
+          <input type="text" id="playerNameInput" placeholder="Engineer Name..." maxlength="18" />
+          <button id="saveScoreBtn" class="btn btn-save">SAVE SCORE</button>
+        </div>
+      </div>
+
+      <!-- Dynamic Shareable Badge Canvas -->
+      <div class="badge-container">
+        <h3>🚀 Shareable Engineers' Day Score Card</h3>
+        <canvas id="scoreCardCanvas" width="400" height="200"></canvas>
+      </div>
+
+      <!-- Game Over Action Buttons -->
+      <div class="modal-actions">
+        <button id="playAgainBtn" class="btn btn-primary">
+          🔄 PLAY AGAIN
+        </button>
+        <button id="overLeaderboardBtn" class="btn btn-secondary">
+          🏆 LEADERBOARD
+        </button>
+        <button id="homeBtn" class="btn btn-secondary">
+          🏠 HOME
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== LEADERBOARD MODAL ==================== -->
+  <div id="leaderboardModal" class="modal">
+    <div class="modal-content glass-card">
+      <div class="modal-header">
+        <h2>🏆 ENGINEER'S DAY LEADERBOARD</h2>
+        <button id="closeLeaderboardBtn" class="close-btn">&times;</button>
+      </div>
+
+      <div class="leaderboard-table-wrapper">
+        <table class="leaderboard-table">
+          <thead>
+            <tr>
+              <th>RANK</th>
+              <th>NAME</th>
+              <th>SCORE</th>
+              <th>BALLOONS</th>
+              <th>DATE</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboardTbody">
+            <!-- Rows rendered dynamically via JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="modal-footer">
+        <button id="closeLeaderboardFooterBtn" class="btn btn-secondary">
+          CLOSE LEADERBOARD
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== CAMERA ERROR MODAL ==================== -->
+  <div id="cameraErrorModal" class="modal">
+    <div class="modal-content glass-card error-card">
+      <div class="error-icon">📷</div>
+      <h2>Camera Access Required</h2>
+      <p>Camera access is required to play this gesture-controlled game.</p>
+      <p class="error-subtext">Please make sure your webcam is connected, allow camera permissions in your browser settings, and try again.</p>
+      <button id="retryCameraBtn" class="btn btn-primary">
+        🔄 TRY AGAIN
+      </button>
+    </div>
+  </div>
+
+  <!-- Main JavaScript File -->
+  <script src="script.js"></script>
+</body>
+</html>
